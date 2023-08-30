@@ -1,7 +1,7 @@
 <template>
 	<view class="hinput">
 		<view >
-			<input type="text" name="name" id="id" :placeholder="tip">
+			<input type="text" name="name" id="id" :placeholder="tip" :value="v">
 		</view>
 	</view>
 </template>
@@ -11,7 +11,7 @@
 		name:"hinput",
 		props:{
 			tip:String,
-			
+			v:'',
 		},
 		data() {
 			return {
