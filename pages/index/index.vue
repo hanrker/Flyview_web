@@ -1,6 +1,6 @@
 <template>
 	<view class="content">
-		<scroll-view v-if="true" class="params" scroll-y="" show-scrollbar='false'>
+		<scroll-view v-if="false" class="params" scroll-y="" show-scrollbar='false'>
 			<view class="status">
 				<h3>滑翔机状态</h3>
 				<view class="item">
@@ -125,7 +125,9 @@
 			<view class="animation">
 				<h3>虚拟成像</h3>
 				<view class="" height="100px" width="100%">
-					{{action_name}}
+					<text>{{action_name}}</text>
+					<text>{{fangzhen_status}}</text>
+					
 				</view>
 				<video id="fangzhen" muted :src="video_src" show-center-play-btn="false" controls="false"></video>
 
@@ -135,7 +137,7 @@
 					controls="false"></video>
 				<video v-if="animation_index==4" src="@/static/video/testv.mp4" show-center-play-btn="false"
 					controls="false"></video> -->
-				<view class="model">
+				<view class="model" v-if="false">
 					<view class="select">
 						<view class="item">
 							<text class="item_title">单模块性能测试:</text>
@@ -155,16 +157,13 @@
 						<img src="" alt="">
 						<button style="display:block;width:80%;height: 80%;">停止</button>
 					</view>
-
-
-
 				</view>
-				<view class="Aciton">
+				<view class="Aciton" v-if="true" style="display: flex;">
 
 					<button @click="fangzhen_start">开始仿真</button>
 					<button id="fangzhen_zanting" @click="fangzhen_pause">暂停仿真</button>
 					<button @click="fangzhen_end">退出仿真</button>
-					<button @click="fangzhen_start">数据回溯</button>
+					<!-- <button @click="fangzhen_start">数据回溯</button> -->
 				</view>
 			</view>
 
@@ -183,6 +182,8 @@
 	import hinput from '@/component/hinput/hinput.vue'
 	import * as echarts from 'echarts';
 	import 'echarts-gl';
+	
+	import ws from '@/common/ws.js'
 
 	import {
 		global
@@ -215,7 +216,7 @@
 					[1, 200, 80]
 				],
 				params: {
-					begin_action: '',
+					begin_action: '222',
 					pause_action: '',
 					stop_action: '',
 				},
@@ -223,13 +224,33 @@
 				action_name: '暂无动作',
 				fangzhen_current:-1,
 				fangzhen_status:"",
+				fangzhen_status_plc:"",
 				//动画计时器
 				timer: null,
 				time: 0
 			}
 		},
+		computed:{
+			fangzhen_status(){
+				if (fangzhen_status == "start"){
+					return fangzhen_status = "仿真开始"
+				}else if (fangzhen_status == "pause"){
+					return fangzhen_status = "仿真开始"
+				}else if (fangzhen_status == "stop"){
+					return fangzhen_status = "仿真结束"
+				}
+			}
+		},
 		components: {
 			hinput,
+		},
+		watch:{
+			begin_action(newName,oldName){
+				console.log(newName)
+				if (newName == "false"){
+					this.fangzhen_start()
+				}
+			}
 		},
 		async onReady() {
 			// this.chart();
@@ -237,31 +258,36 @@
 			const self = this;
 			var chartDom = document.getElementById("chart");
 			self.myChart = echarts.init(chartDom);
+			
+			//初始化曲线
 			self.FanLinTargetALL = await self.Init("FanLinTarget")
+			// self.FanLinTargetALL = await self.Init("test")
 			self.FanLinMissileALL = await self.Init("FanLinMissile")
 			self.FangKongTargetALL = await self.Init("FangKongTarget")
 			self.FangKongMissileALL = await self.Init("FangKongMissile")
-			// self.FanLinMissileALL =await self.UpdateDataFromFile( "/static/dat/FanLinMissile.dat")
-			// self.FangKongTargetALL =await self.UpdateDataFromFile("/static/dat/FangKongTarget.dat")
-			// self.FangKongMissileALL =await self.UpdateDataFromFile("/static/dat/FangKongMissile.dat")
-
-			// self.ChangeChartByRequest("process")
-			// self.ChangeChart("process")
-			self.ChangeChart("zxddxh")
 			
+			self.ChangeChart("process")
+			
+			self.CreateWs()
 
 			//更新参数
-
+				console.log(global.fz_action_tag)
 			setInterval(() => {
 				self.UpdataParams()
+			 
+				// self.fangzhen_status_plc = self.GetDataByTagname("oml.flyview.fz_action")
+				// console.log("fangzhen_status",self.params.begin_action)
 				// console.log("show:", self.params)
+				if (self.params.begin_action=="true"){
+					self.fangzhen_start()
+				}
 			}, 5000)
 
 
 		},
 		onShow() {
 			// const self = this;
-			// 	self.UpdataParams()
+			
 		},
 
 		methods: {
@@ -286,14 +312,14 @@
 					yAxis: {
 						type: 'value'
 					},
-					series: [{
-						name:"FanLinTarget",
+					series: [
+						{
+							name:"FanLinTarget",
 							data: self.FanLinTarget,
+							// data:[[1,2],[2,4],[5,6]],
 							type: 'line',
-							smooth: false,
-							 lineStyle:{
-							       width:1
-							     }
+							smooth: true,
+							
 						},
 						{
 							name:"FanLinMissile",
@@ -431,21 +457,7 @@
 
 
 
-			// 从文件更新数据
-			async UpdateDataFromFile(filepath, nums, dom) {
-				const self = this;
-				// console.log("selfx.FanLinTarget old", typeof(self.FanLinTarget))
-				var filedata
-				if (filepath != '') {
-					filedata = await self.ReadDataFromDatPath(filepath)
-				} else {
-					var datfile = await self.Selectfile(['.dat'])
-					filedata = await self.ReadDataFromDat(datfile)
-
-				}
-				// console.log("从文件得到的数组：",filedata)
-				return filedata
-			},
+			
 			//根据数据更新曲线
 			UpdateChart(data_type, data, nums) {
 				const self = this
@@ -510,6 +522,21 @@
 				})
 			},
 
+			// 从文件更新数据
+			async UpdateDataFromFile(filepath, nums, dom) {
+				const self = this;
+				// console.log("selfx.FanLinTarget old", typeof(self.FanLinTarget))
+				var filedata
+				if (filepath != '') {
+					filedata = await self.ReadDataFromDatPath(filepath)
+				} else {
+					var datfile = await self.Selectfile(['.dat'])
+					filedata = await self.ReadDataFromDat(datfile)
+			
+				}
+				// console.log("从文件得到的数组：",filedata)
+				return filedata
+			},
 			//加装指定路径的文件,返回数组
 			ReadDataFromDatPath(path) {
 				const self = this
@@ -592,7 +619,18 @@
 				})
 				return res
 			},
-
+			
+			//获取仿真状态
+			GetFangZhengStatus(){
+				const self =this
+				var ws = self.CreateWs()
+				ws.onMessage((res)=>{
+					console.log(res.data)
+				})
+			},
+			
+	
+			
 			//开始仿真
 			//1s更新一次
 			fangzhen_start() {
@@ -600,19 +638,19 @@
 				
 				self.fangzhen_current = 0
 				console.log("self.timer",self.timer)
-				if (self.fangzhen_status=='end' || self.fangzhen_status=='start'  ){
-					self.fangzhen_end()
-					self.fangzhen_current = -1
-					console.log("重置时间:",self.fangzhen_current)
-				}
-				self.fangzhen_status ='start'
+				// if (self.fangzhen_status=='end' || self.fangzhen_status=='start'  ){
+				// 	self.fangzhen_end()
+				// 	self.fangzhen_current = -1
+				// 	console.log("重置时间:",self.fangzhen_current)
+				// }
+				// self.fangzhen_status ='start'
 				self.timer = setInterval(() => {
+						console.log("时间:",self.fangzhen_current)
+					if (self.fangzhen_status !='start'){
 						
-					if (self.fangzhen_status =='start'){
-						// self.UpdataParams()
 						if  (self.fangzhen_current <0) {
 							self.video_src = "/static/video/01.mp4"
-
+								
 						} else if(self.fangzhen_current < 20) {
 							self.video_src = "/static/video/01.mp4"
 							self.action_name = "变外形节点"	
@@ -634,13 +672,13 @@
 							clearInterval(self.timer)
 							self.fangzhen_status ='stop'
 						}
-						console.log("时间:",self.fangzhen_current)
-						if (self.fangzhen_status=='start'){
+						
+						
 							uni.createVideoContext("fangzhen").play()
-							self.fangzhen_current = self.fangzhen_current + 1
-						}
+							
+						self.fangzhen_status ='start'
 					}
-				
+				self.fangzhen_current = self.fangzhen_current + 1
 				}, 1000)
 
 
@@ -674,14 +712,6 @@
 				
 				clearInterval(self.timer)
 				self.timer = null
-			},
-
-			//批量更新图表数据
-			UpdateCharts(types, data, nums) {
-				const self = this
-				types.forEach((item, key, arr) => {
-					self.UpdateChart(types[key], data[key], nums)
-				})
 			},
 
 			//更改图表类型
@@ -733,33 +763,36 @@
 			//更新参数
 			async UpdataParams() {
 				const self = this
-				self.params.begin_action = await self.GetDataByTagname("simulator.flyview.action1")
-				self.params.pause_action = await self.GetDataByTagname("simulator.flyview.action2")
+				// self.params.begin_action = await self.GetDataByTagname("oml.flyview.fz_action")
+				// self.params.pause_action = await self.GetDataByTagname("simulator.flyview.action2")
 				// console.log("self.params", self.params)
+				self.params.begin_action = await self.GetDataByTagname(global.fz_action_tag)
+				
 			},
 
-			//根据tagname订阅数据
+			//根据tagname获取数据
 			GetDataByTagname(tagname) {
 				var data
 				return new Promise(function(resolve, reject) {
 					uni.request({
 						url: global.baseurl + "/iot/opcua/get/",
 						method: "GET",
-						params: {
-							"url": "opc.tcp://localhost:49320",
+						data: {
+							"url": global.baseOPCUA,
 							"nodeId": tagname
 						},
 						success(res) {
 							data = res.data[tagname]
-							// console.log(tagname, ":", data)
+							console.log(tagname, ":", data)
 							resolve(data)
 						}
 					})
 				})
 			},
 
-			//从接口初始化数据
+			//从接口获取曲线数据，初始化数据
 			Init(data_type) {
+				console.log(global.baseurl)
 				var data
 				return new Promise((resolve, reject) => {
 					uni.request({
@@ -802,13 +835,22 @@
 					})
 				})
 			},
-			async ChangeChartByRequest(chart_type) {
+			
+			
+			//建立ws链接
+			CreateWs(){
 				const self = this
-				if (chart_type == 'process') {
-					// await self.RequestChartData([7, 8, 9])
-
-					SplitArray(self.FanLinTargetALL, [7, 8, 9])
-				}
+				console.log("建立ws链接")
+				var ws = uni.connectSocket({
+					url:global.basews+"/api/iot/getdata",
+					header:{
+						'content-type':'application/json'
+					},
+					success() {
+						console.log("ws建立成功")
+					}
+				})
+				return ws
 			}
 		},
 		onUnload: {
@@ -822,10 +864,10 @@
 <style>
 	button {
 		margin: 5rpx;
-		width: 100rpx;
-		height: 40rpx;
+		width: 200rpx;
+		height: 70rpx;
 		font-size: 12rpx;
-		display: inline;
+		display: inline-block;
 		/* height: 50rpx; */
 	}
 
@@ -911,7 +953,7 @@
 	.views {
 		display: flex;
 		flex-direction: row;
-		width: 80%;
+		width: 95%;
 		height: 100%
 	}
 
@@ -936,7 +978,7 @@
 		flex-direction: column;
 		height: 100%;
 		width: 80%;
-		justify-content: center;
+		/* justify-content: center; */
 	}
 
 	#fangzhen {

@@ -70,7 +70,7 @@
     },
     "vueVersion" : "2",
     "h5" : {
-        "template" : "",
+        "template" : "template.h5.html",
         "title" : "FlyView",
         "devServer" : {
             "https" : false
