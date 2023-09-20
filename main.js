@@ -23,7 +23,6 @@ try {
       return new Promise((resolve, reject) => {
         res.then((res) => {
           if (res[0]) {
-            reject(res[0]);
           } else {
             resolve(res[1]);
           }
