@@ -109,6 +109,7 @@
 							<option value="pj_psi_t">飞行器弹道偏角（Psi-T）曲线</option>
 						</select>
 					</view>
+					
 
 					<br>
 
@@ -117,6 +118,11 @@
 				<view id="chart" class="chart" style="width: 90%;height:90% ;"></view>
 				<!-- <view id="chart" class="threechart" style="width: 90%;height:90% ;"></view> -->
 				<!-- <div id="Fangkong" style="width: 600px;height:400px;"></div> -->
+				<view class="info">
+					<text>弹道信息：</text>
+					<br>
+					<text>类型：{{task_type}}</text>
+				</view>
 			</view>
 
 			<view class="animation">
@@ -144,7 +150,7 @@
 				</view>
 				<video id="fangzhen" muted :src="video_src" :controls="false" :show-play-btn="false"
 					:show-center-play-btn="false" @ended="video_end" @timeupdate="PlayVideo"></video>
-
+					
 				<!-- <view class="Aciton" v-if="true" style="display: flex;">
 
 					<button @click="fangzhen_start(0)">开始仿真</button>
