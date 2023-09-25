@@ -99,7 +99,7 @@
 				<view class="fuc">
 					<h3 style="display: inline">飞行弹道显示</h3>
 					<view class="">
-						<select :disabled="taskdisable" name="chart_type" id="chart_type" @change='ChangeChart'>
+						<select :disabled="taskdisable" name="chart_type" id="chart_type" @change='UpdateChart'>
 							<option value="process">飞行器与目标对飞过程</option>
 							<option value="zxddxh">飞行器纵向（X-H）平面飞行弹道</option>
 							<option value="cxddxy">飞行器侧向（X-Y）平面飞行弹道</option>
@@ -114,7 +114,7 @@
 
 
 				</view>
-				<view id="chart" class="threechart" style="width: 90%;height:90% ;"></view>
+				<view id="chart" class="chart" style="width: 90%;height:90% ;"></view>
 				<!-- <view id="chart" class="threechart" style="width: 90%;height:90% ;"></view> -->
 				<!-- <div id="Fangkong" style="width: 600px;height:400px;"></div> -->
 			</view>
@@ -142,10 +142,8 @@
 					<text class="item_title">仿真状态：{{fangzhen_status_name}}</text>
 
 				</view>
-				<video id="fangzhen" muted :src="video_src" controls="false" show-play-btn="false"
-					show-center-play-btn="false" @ended="video_end" @timeupdate="PlayVideo"></video>
-
-				
+				<video id="fangzhen" muted :src="video_src" :controls="false" :show-play-btn="false"
+					:show-center-play-btn="false" @ended="video_end" @timeupdate="PlayVideo"></video>
 
 				<!-- <view class="Aciton" v-if="true" style="display: flex;">
 
@@ -186,7 +184,7 @@
 	export default {
 		data() {
 			return {
-				task_type: "FanLin",
+				task_type: "fanlin",
 				task_options: [{
 						name: "反临飞行任务",
 						id: "FanLin"
@@ -254,7 +252,7 @@
 					// console.log("element:",element,oldName[element])
 					if (newName[element] == "true" && newName[element] != oldName[element] && oldName[element] !=
 						undefined) {
-						// console.log("newName:", element,"，",newName[element], ";oldName:", oldName[element])
+						console.log("newName:",typeof(newName) ,element,"，",newName[element], ";oldName:", oldName[element])
 						
 						// console.log("nodes:", self.nodeIds,self.fzanimation)
 						var index = self.nodeIds.indexOf(element)
@@ -276,7 +274,7 @@
 						// console.log("是否执行弹道：",isChartDisplay)
 						
 						//执行曲线
-						self.ChangeChart(isChartEnd,chart_duration,isChartDisplay,isChartDynamic,target_wait)
+						self.UpdateChart(isChartEnd,chart_duration,isChartDisplay,isChartDynamic,target_wait)
 						
 					}
 				}
@@ -313,41 +311,29 @@
 			hinput,
 		},
 
-		async onReady() {
+		 onReady() {
 			
 			const self = this;
-			
-			//获取硬件参数
-			self.GetConfig()
-			
 			//获取图表dom元素，初始化echart
 			var chartDom = document.getElementById("chart");
 			self.myChart = echarts.init(chartDom);
-				
-			//初始化曲线数据
-			self.FanLinTargetALL = await self.Init("FanLinTarget")
-			// self.FanLinTargetALL = await self.Init("test")
-			self.FanLinMissileALL = await self.Init("FanLinMissile")
-			self.FangKongTargetALL = await self.Init("FangKongTarget")
-			self.FangKongMissileALL = await self.Init("FangKongMissile")
+			//获取硬件参数
+			self.GetConfig()
 			
-			
-			// //建立ws连接，获取node值
-			// self.WSGetNodeValues("/api/update/")
-			// 连接opc
-			// self.CreateOPCUA(global.baseOPCUA)
-
-			// 展示曲线，默认为process类型
-			self.ChangeChart("process")
-			
+			self.GetAllChartData()
+		
+					
+			//建立ws连接，获取node值变化值
+			self.WSGetNodeValues("/api/update/","fzaction")
+		
 			
 			// 创建仿真视频
 			self.videoContext = uni.createVideoContext("fangzhen", self)
 			
-			
-			setInterval(() => {
-				self.UpdataParams()
-			}, 1000)
+	
+			// setInterval(() => {
+			// 	self.UpdataParams()
+			// }, 1000)
 
 
 		},
@@ -357,6 +343,27 @@
 		},
 
 		methods: {
+			//获取所有曲线源数据，更新曲线 
+		    async	GetAllChartData(){
+				const self = this;
+				console.log("开始初始化数据")
+				uni.showLoading({
+					title:"加载曲线"
+				})
+				//初始化曲线数据
+				self.FanLinTargetALL = await self.Init("FanLinTarget")
+				// self.FanLinTargetALL = await self.Init("test")
+				self.FanLinMissileALL = await self.Init("FanLinMissile")
+				self.FangKongTargetALL = await self.Init("FangKongTarget")
+				self.FangKongMissileALL = await self.Init("FangKongMissile")
+				
+				
+				// 展示曲线，默认为process类型
+				self.UpdateChart(false,60,false,false,0)
+				uni.hideLoading()
+				console.log("数据初始化完成")	
+			},
+			
 			//动画加载完成时触发
 			PlayVideo(event){
 				this.animation_current = event.detail.currentTime
@@ -386,7 +393,7 @@
 				const self = this
 
 				self.task_type = document.getElementById("changeTask").value
-				self.ChangeChart()
+				self.UpdateChart()
 				// console.log(self.task_type)
 				
 			},
@@ -398,63 +405,107 @@
 				}
 			},
 			//生成二维折线图
-			chart(dom, data_series_all, isDynamic = false, ani_vate = 80,isChartDisplay = false,target_wait=0) {
+			chart_DanDao(dom='chart', data_series_all,linetype = 'line3D', isDynamic = false, char_duration = 80,isChartDisplay = false,target_wait=0) {
 				const self = this
 				var chartDom = document.getElementById(dom)
 
 				self.ClearChart()
-				console.log("更新二维数据")
+				console.log("开始绘制曲线")
 				// self.myChart.showloa()
 				var option;
-
-				option = {
-					xAxis: {
-						type: 'value',
-					},
-
-					legend: {
-						data: [data_series_all[0].name, data_series_all[1].name],
-					},
-					yAxis: {
-						type: 'value'
-					},
-					animationDuration: 2000,
-					series: [
-						{
-							name: data_series_all[0].name,
-							type: "line",
-							data: [],
-							lineStyle: {
-								width: 1
-							}
+				if (linetype == "line"){
+					option = {
+						xAxis: {
+							type: 'value',
 						},
-						{
-							name: data_series_all[1].name,
-							type: "line",
-							data: [],
-							lineStyle: {
-								width: 4
-							}
+					
+						legend: {
+							data: [data_series_all[0].name, data_series_all[1].name],
 						},
-					],
-
-
-				};
-				
-				
-				
+						yAxis: {
+							type: 'value'
+						},
+						// animationDuration: 2000,
+						series: [
+							{
+								name: data_series_all[0].name,
+								type: linetype,
+								data: [],
+								lineStyle: {
+									width: 1
+								}
+							},
+							{
+								name: data_series_all[1].name,
+								type: linetype,
+								data: [],
+								lineStyle: {
+									width: 4
+								}
+							},
+						],
+					
+					
+					};
+					
+				}
+				if (linetype == "line3D"){
+					option = {
+						xAxis3D: {
+							type: 'value',
+						},
+					
+						legend: {
+							data: [data_series_all[0].name, data_series_all[1].name],
+						},
+						yAxis3D: {
+							type: 'value'
+						},
+						zAxis3D: {
+							type: 'value'
+						},
+						grid3D: {
+							viewControl: {
+								projection: 'orthographic',
+								orthographicSize: 200,
+								
+							},
+						
+						},
+						// animationDuration: 2000,
+						series: [
+							{
+								name: data_series_all[0].name,
+								type: linetype,
+								data: [],
+								lineStyle: {
+									width: 1
+								}
+							},
+							{
+								name: data_series_all[1].name,
+								type: linetype,
+								data: [],
+								lineStyle: {
+									width: 4
+								}
+							},
+						],
+					
+					
+					};
+					console.log("绘制曲线完成")
+				}
 				
 				//根据missle.dat行数确定数据读取的行数
-	
 				var maxlen = data_series_all[1].data.length
 				// data_series_all.forEach((d, i) => {
-				// 	if (maxlen < d.data.length) {
-				// 		maxlen = d.data.length
-				// 	}
+
+
+				//根据曲线持续时间，计算曲线更新速度，每100ms速度
 				
-				// })
-				ani_vate =  Math.trunc(1000 * ani_vate / maxlen) 
-				console.log("播放速度：",maxlen,ani_vate)
+				var chart_v =  Math.trunc(maxlen/(10*char_duration)) 
+				console.log("播放速度：",maxlen,chart_v,"持续：",char_duration)
 				self.myChart.resize({
 					width: chartDom.offsetWidth * 1,
 					height: chartDom.offsetHeight * 1,
@@ -462,163 +513,64 @@
 				window.addEventListener('resize', function() {
 					self.myChart.resize();
 				});
+				
 				if (option && typeof option === "object" &&isChartDisplay ) {
 					if (isDynamic) {
+						//曲线动态展示
 						var index = 0;
+						
 						self.chart_interval = setInterval(() => {
-							if (true){
 								// 处理数组数据
-								var arrayt01 = data_series_all[0].data[index]
-								var arrayt02 = data_series_all[1].data[index]
-								// console.log("arrayt01:",arrayt01)
-								// 	console.log("data_series_all",index,":",arrayt01,arrayt02)
+								var chart_dynamic_vate
+								var dandaodata= []
+								var targetdata = []
 								
-								// console.log("target_wait",ani_vate,target_wait,maxlen,index)
-								//更新曲线数据
-								//等到一定后，加装目标
-								if (index >=target_wait*ani_vate){
-									option.series[0].data.push(arrayt01)
+								// console.log("共",maxlen,"每s取：",chart_v)
+
+								// 计算起始与结束行数据
+								var start_num = index 
+								var end_num = start_num + chart_v -1
+								
+								// console.log("index",index ,"范围：",start_num,end_num)
+								// 每100ms读取若干行数据
+								var i = index
+								for(i=start_num;i<=end_num && i < maxlen;i++){
+									// console.log("范围：",index*chart_v,index *chart_v +chart_v)
+									// console.log("data_series_all[0].data[i]",i,data_series_all[0].data[i])
+									dandaodata.push(data_series_all[1].data[i])
+									// console.log("目标",i-target_wait*10,i)
+									if (i >= target_wait*10){
+										// console.log("data_series_all[0].data[i-target_wait*10]",data_series_all[0].data[i-target_wait*10])
+										targetdata.push(data_series_all[0].data[i-target_wait*10])
+									}
+									
 								}
+								// 曲线数据更新
+								option.series[1].data.push(...dandaodata)
+								// 曲线数据更新
+								option.series[0].data.push(...targetdata)
 								
-								option.series[1].data.push(arrayt02)
 								
 								option && self.myChart.setOption(option, true);
-								index = index + 1;
-								if (index >= maxlen || self.fangzhen_status=="stop") {
+								index = end_num +1;
+								if (end_num >=maxlen) {
+									console.log("i:",i)
 									clearInterval(self.chart_interval)
 								}
-							}
 							
-						}, ani_vate);
+							
+						}, 100);
 					} else {
 						option.series[0].data = data_series_all[0].data
 						option.series[1].data = data_series_all[1].data
 						self.myChart.setOption(option);
 					}
 				}else{
-					self.myChart.setOption(option);
-				}
-			},
-
-			//生成三维折线图
-			threeChart(dom, data_series_all, isDynamic = false, ani_vate = 10,isChartDisplay = false,target_wait=0) {
-
-				const self = this
-				console.log("更新三维数据")
-
-				var chartDom = document.getElementById(dom);
-				// var myChart = echarts.init(chartDom)
-				self.ClearChart()
-				var option;
-				//选项
-				option = {
-					tooltip: {},
-
-					legend: {
-						data: [data_series_all[0].name, data_series_all[1].name],
-					},
-
-					xAxis3D: {
-						type: 'value'
-					},
-					yAxis3D: {
-						type: 'value'
-					},
-					zAxis3D: {
-						type: 'value'
-					},
-					grid3D: {
-						viewControl: {
-							projection: 'orthographic',
-							orthographicSize: 200,
-						},
-
-					},
-					series: [
-						{
-							name: data_series_all[0].name,
-							type: "line3D",
-							data: [],
-							lineStyle: {
-								width: 1
-							}
-						},
-						{
-							name: data_series_all[1].name,
-							type: "line3D",
-							data: [],
-							lineStyle: {
-								width: 4
-							}
-						},
-
-					],
-					// animationDuration:50000,
-
-				};
-				// console.log("sdsd")
-				self.myChart.resize({
-					width: chartDom.offsetWidth * 1,
-					height: chartDom.offsetHeight * 1,
-				});
-
-				//确定数据中最大数量
-				var maxlen = data_series_all[1].data.length
-				
-				// data_series_all.forEach((d, i) => {
 					
-				// 	if (maxlen < d.data.length) {
-				// 		maxlen = d.data.length
-				// 	}
-				// 	// console.log("最大：",d.data.length,maxlen)
-				// })
-				
-				ani_vate =  Math.trunc(1000 * ani_vate / maxlen) 
-				console.log("播放速度：",ani_vate,maxlen)
-				// option && self.myChart.setOption(option);
-				window.addEventListener('resize', function() {
-					self.myChart.resize();
-				});
-
-				if (option && typeof option === "object" && isChartDisplay) {
-					if (isDynamic) {
-						var index = 0;
-						self.chart_interval = setInterval(() => {
-							if (true){
-								// 处理数组数据
-								var arrayt01 = data_series_all[0].data[index]
-								var arrayt02 = data_series_all[1].data[index]
-								// console.log("arrayt01:",arrayt01)
-									// console.log("data_series_all",index,":",arrayt01,arrayt02)
-								//更新曲线数据
-								// 等到若干时间时，开始加装目标曲线
-								
-								if (index >=target_wait * ani_vate){
-									option.series[0].data.push(arrayt01)
-								}
-							
-								
-								option.series[1].data.push(arrayt02)
-								
-								option && self.myChart.setOption(option, true);
-								index = index + 1;
-								if (index >= maxlen ) {
-									clearInterval(self.chart_interval)
-								}
-							}
-							
-						}, ani_vate);
-					} else {
-						option.series[0].data = data_series_all[0].data
-						option.series[1].data = data_series_all[1].data
-						self.myChart.setOption(option);
-					}
-				}{
-					self.myChart.setOption(option);
+					option &&  self.myChart.setOption(option);
 				}
-
 			},
-			
+
 			//初始化chart
 			ClearChart(){
 				const self = this
@@ -626,18 +578,10 @@
 				clearInterval(self.chart_interval)
 			},
 
-			//格式化数组，更改数组格式
-			StringToNum(arr) {
-				var res = []
-				arr.forEach((v, i) => {
-					res[i] = v
-				})
-				return res
-			},
-			//更改图表类型
-			//self.ChangeChart(isChartEnd,isChartDynamic,false,chart_duration,isChartDisplay)
 			
-			ChangeChart(isChartEnd = false,chart_v= 80,isChartDispaly=false,isDynamic=false,target_wait) {
+			
+			UpdateChart(isChartEnd = false,chart_v= 80,isChartDispaly=false,isDynamic=false,target_wait) {
+				console.log("开始更新曲线")
 				const self = this
 				var chart_type = document.getElementById("chart_type")
 				self.fly_chart_type = chart_type.value
@@ -645,37 +589,37 @@
 				var data_series
 				chart_dom = 'chart'
 				var nums
+				linetype = "line"
 				// console.log(e)
 				if (self.fly_chart_type == 'process') {
-					chart_type = "threeChart"
+					linetype = "line3D"
 					nums = [7, 8, 9]
-				} else if (self.fly_chart_type == 'zxddxh') {
-					chart_type = "chart"
+				} else if (self.fly_chart_type == 'zxddxh') {	
 					nums = [7, 8]
 
-				} else if (self.fly_chart_type == 'cxddxy') {
-					chart_type = "chart"
+				} else if (self.fly_chart_type == 'cxddxy') {	
 					nums = [7, 9]
 
 				} else if (self.fly_chart_type == 'vt') {
-					chart_type = "chart"
+					
 					nums = [0, 4]
 
 				} else if (self.fly_chart_type == 'qj_gama_t') {
-					chart_type = "chart"
+					
 					nums = [0, 5]
 
 				} else if (self.fly_chart_type == 'pj_psi_t') {
-					chart_type = "chart"
+		
 					nums = [0, 6]
 
 				}
 
 				
 				console.log("self.task_type:", self.task_type)
-				if (self.task_type == "FanLin") {
-					self.UpdateChart("FanLinTarget", self.FanLinTargetALL, nums)
-					self.UpdateChart("FanLinMissile", self.FanLinMissileALL, nums)
+				if (self.task_type == "fanlin") {
+					console.log("fanlinsss")
+					self.UpdateTaskData("FanLinTarget", self.FanLinTargetALL, nums)
+					self.UpdateTaskData("FanLinMissile", self.FanLinMissileALL, nums)
 					data_series = [{
 						name: "反临目标",
 						data: self.FanLinTarget,
@@ -684,9 +628,10 @@
 						name: "反临飞行",
 						data: self.FanLinMissile,
 					}]
-				} else if (self.task_type == "FangKong") {
-					self.UpdateChart("FangKongTarget", self.FangKongTargetALL, nums)
-					self.UpdateChart("FangKongMissile", self.FangKongMissileALL, nums)
+				}else if(self.task_type == "fangkong") {
+					console.log("fangllongsss")
+					self.UpdateTaskData("FangKongTarget", self.FangKongTargetALL, nums)
+					self.UpdateTaskData("FangKongMissile", self.FangKongMissileALL, nums)
 					data_series = [{
 							name: "防空目标",
 							data: self.FangKongTarget,
@@ -699,31 +644,24 @@
 				}
 				
 				
-				//仿真到拆件时，曲线暂停
-				if (!isChartEnd || isChartDispaly){
-					isDynamic =true 
-					// //仿真开始或暂停时，动态更新
-					// if (self.fangzhen_status == "start" || self.fangzhen_status == "pause"){
-					// 		isDynamic =true 
-					// }
-				}
+				// //仿真到拆件时，曲线暂停
+				// if (!isChartEnd && isChartDispaly){
+				// 	isDynamic =true 
+				// }
 			
-				console.log("曲线参数：",isChartDispaly,isDynamic)
+				// console.log("待绘制曲线类型：",linetype,"是否动态：",isDynamic,isChartDispaly,isChartEnd,data_series)
 				
-				if (chart_type == "threeChart") {
-					self.threeChart(chart_dom, data_series,isDynamic,chart_v,isChartDispaly,target_wait);
-				} else if (chart_type == "chart") {			
-					self.chart(chart_dom, data_series,isDynamic,chart_v,isChartDispaly,target_wait);
-				}
-				console.log(chart_type + ":更新曲线完成")
+				self.chart_DanDao(chart_dom, data_series,linetype,isDynamic,chart_v,isChartDispaly,target_wait);
+				
+				console.log("更新曲线完成")
 			},
 			
 
 
 			//根据数据更新曲线
-			UpdateChart(data_type, data, nums) {
+			UpdateTaskData(data_type, data, nums) {
 				const self = this
-				console.log("开始更新图表数据")
+				console.log("开始更新任务数据")
 				var chartdata = self.SplitArray(data, nums)
 
 				switch (data_type) {
@@ -744,7 +682,7 @@
 						// console.log("FangKongMissile")
 						break;
 				}
-				console.log(data_type + ":更新数据完成")
+				console.log(data_type + ":任务数据更新完成")
 
 			},
 
@@ -873,24 +811,26 @@
 
 			//开始仿真
 			//1s更新一次
-			fangzhen_start(start_time = 0, animation = "init.mp4", ani_v = 1, isConst = true) {
+			fangzhen_start(start_time = 0, animation = "init.mp4", ani_v = 1, isConst = true,isChartEnd = false) {
 				const self = this
 				self.fangzhen_status = 'start'
 				// console.log("start_time", start_time)
 				self.fz_current_time = start_time
-				// console.log("播放动画为",animation)
+				console.log("播放动画为",animation)
 				
+				// //当末尾曲线停止时，动画继续
+				// if (isChartEnd){
+				// 	return
+				// }
 				//动画不一样时，重新指定
-				if (animation != self.video_src) {
+				if (animation != self.video_src ) {
 					self.video_src = "/static/video/" + animation
 				}
 				//指定速率
 				if (self.videoContext != undefined){
 					self.videoContext.playbackRate(ani_v)
 				}
-				// if(isChartDynamic){
-				// 	self.ChangeChart(isChartend,chart_v,isChartDispaly)
-				// }
+				
 				
 				self.timer = setInterval(() => {
 					// console.log("self.fz_current_time:", self.fz_current_time)
@@ -934,7 +874,7 @@
 					self.videoContext.play()
 					self.videoContext.seek(self.fz_current_time)
 					self.fangzhen_status = 'start'
-					// self.ChangeChart()
+					
 				}
 				// console.log("仿真状态:", self.fangzhen_status)
 			},
@@ -950,7 +890,7 @@
 
 				clearInterval(self.timer)
 				self.timer = null
-				self.ChangeChart()
+				self.UpdateChart()
 				console.log("仿真状态:", self.fangzhen_status)
 			},
 
@@ -1097,8 +1037,9 @@
 			WSGetNodeValues(url ,datatype) {
 				const self = this
 				console.log("建立ws链接")
+				var timetamp = new Date().getTime()
 				var ws = uni.connectSocket({
-					url: global.basews + url +"?datatype="+datatype ,
+					url: global.basews + url +"?datatype="+datatype+timetamp ,
 				
 					header: {
 						'content-type': 'application/json'
@@ -1108,8 +1049,9 @@
 					}
 				})
 				uni.onSocketMessage( (res)=> {
-				  console.log('收到服务器内容：' + res.data);
-				  self.StartFangZhen(res.data)
+				var data = JSON.parse(res.data)
+				  console.log('收到服务器内容：' , data.data,typeof(data.data));
+				  self.StartFangZhen(data.data)
 				});
 				return ws
 			},
@@ -1117,15 +1059,47 @@
 			//根据变化的数值，执行仿真
 			StartFangZhen(nodeValue){
 				const self = this
-				
+				// console.log("nodeValue:",nodeValue)
 				//获取文件中的node id，执行对应的动画和曲线时长
-				var nodeid = Object.keys(nodeValue)
+				var nodeid = Object.keys(nodeValue)[0]
+				
 				var index = self.nodeIds.indexOf(nodeid)
-				self.fzanimation_current_name = self.fzanimation[index]
-				console.log("待执行：",nodeValue,nodeid,index)
-				if (nodeValue[nodeid] == true){
-					self.fangzhen_start(0,self.fzanimation_current_name,self.chart_duration[index])
+				console.log("fzanimation:", index,",",nodeid,nodeid.indexOf("fangkong"))
+				var animaion_name = self.fzanimation[index][0]
+				var chart_duration = config.params[index].chart_duration
+				var isChartDynamic= config.params[index].isChartDynamic
+				var isChartDisplay = config.params[index].isChartDispaly
+				var isChartEnd = config.params[index].isChartEnd
+				
+				var target_wait= config.params[index].target_wait
+				self.fzanimation_current_name = animaion_name
+				
+				self.taskdisable = isChartDisplay
+				
+				//判断任务类型
+				
+				if (nodeid.indexOf("fanlin")>0){
+					self.task_type = "fanlin"
+				}else if(nodeid.indexOf("fangkong")>0){
+					self.task_type = "fangkong"
 				}
+				
+				// console.log("isChartDynamic", isChartDynamic)
+				// console.log("animaion_name", animaion_name)
+				// console.log("chart_duration", chart_duration)
+				// console.log("nodeValue[nodeid]:",nodeValue[nodeid])
+				//执行动画
+				if (nodeValue[nodeid] == "true"){
+						self.fangzhen_start(0, animaion_name, 1, true)
+						self.UpdateChart(isChartEnd,chart_duration,isChartDisplay,isChartDynamic,target_wait)
+						
+				}
+			
+				
+				// console.log("是否执行弹道：",isChartDisplay)
+				
+				//执行曲线
+			
 				
 			}
 		},
