@@ -8,7 +8,6 @@ const config ={
 			nodeid : "oml.flyview.fz_fanlin1_start",
 			animation:[
 				"fanlin1.mp4",
-				
 			],
 			chart_duration:80,
 			isChartDynamic: false,
@@ -26,7 +25,7 @@ const config ={
 			isChartDynamic: true,
 			isChartDispaly:true,
 			isChartEnd:false,
-			target_wait: 97,
+			target_wait: 0,
 		},
 		{
 			nodeid : "oml.flyview.fz_fanlin3_end",
