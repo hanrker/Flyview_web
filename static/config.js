@@ -21,7 +21,7 @@ const config ={
 				"fanlin2.mp4",
 				
 			],
-			chart_duration:60,
+			chart_duration:80,
 			isChartDynamic: true,
 			isChartDispaly:true,
 			isChartEnd:false,
