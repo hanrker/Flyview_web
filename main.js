@@ -5,6 +5,11 @@ import Vue from 'vue'
 Vue.config.productionTip = false
 App.mpType = 'app'
 
+// import * as echarts from 'echarts'
+// Vue.use(echarts);
+// Vue.prototype.$echarts = echarts
+
+window.wx= {}
 try {
   function isPromise(obj) {
     return (
